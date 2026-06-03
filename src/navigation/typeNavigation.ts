@@ -5,8 +5,7 @@ export type AuthStackParamList = {
 
 export type AppStackParamList = {
   Home: undefined;
-  CountryDetail: { code: string };
-  NewReport: undefined;    // ← agregar
+  NewReport: undefined;    
   MyReports: undefined; 
 };
 

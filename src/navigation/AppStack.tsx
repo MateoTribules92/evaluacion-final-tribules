@@ -2,7 +2,6 @@ import React from "react";
 import { createStackNavigator } from "@react-navigation/stack";
 import { AppStackParamList } from "./typeNavigation";
 import { HomeScreen } from "../screens/app/HomeScreen";
-import { DetailScreen } from "../screens/app/DetailScreen";
 import { NewReportScreen } from "../screens/app/MyReportsScreen";
 import { MyReportsScreen } from "../screens/app/NewReportScreen";
 
@@ -29,14 +28,6 @@ const AppStack = () => {
         name="Home"
         component={HomeScreen}
         options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="CountryDetail"
-        component={DetailScreen}
-        options={({ route }) => ({
-          title: "Detalle",
-          headerShown: true,
-        })}
       />
       <Stack.Screen
         name="NewReport"
