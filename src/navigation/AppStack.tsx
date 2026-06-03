@@ -3,6 +3,9 @@ import { createStackNavigator } from "@react-navigation/stack";
 import { AppStackParamList } from "./typeNavigation";
 import { HomeScreen } from "../screens/app/HomeScreen";
 import { DetailScreen } from "../screens/app/DetailScreen";
+import { NewReportScreen } from "../screens/app/MyReportsScreen";
+import { MyReportsScreen } from "../screens/app/NewReportScreen";
+
 
 const Stack = createStackNavigator<AppStackParamList>();
 
@@ -31,9 +34,22 @@ const AppStack = () => {
         name="CountryDetail"
         component={DetailScreen}
         options={({ route }) => ({
-          title: "Detalle del Post",
+          title: "Detalle",
           headerShown: true,
         })}
+      />
+      <Stack.Screen
+        name="NewReport"
+        component={NewReportScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="MyReports"
+        component={MyReportsScreen}
+        options={{
+          title: "Mis Reportes",
+          headerShown: true,
+        }}
       />
     </Stack.Navigator>
   );
