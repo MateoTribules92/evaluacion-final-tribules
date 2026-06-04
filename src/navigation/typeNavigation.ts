@@ -7,5 +7,6 @@ export type AppStackParamList = {
   Home: undefined;
   NewReport: undefined;    
   MyReports: undefined; 
+  ReportDetail: { reporte: any };
 };
 

@@ -4,9 +4,7 @@ import { AppStackParamList } from "./typeNavigation";
 import { HomeScreen } from "../screens/app/HomeScreen";
 import { NewReportScreen } from "../screens/app/NewReportScreen";
 import { MyReportsScreen } from "../screens/app/MyReportsScreen";
-
-
-
+import { ReportDetailScreen } from "../screens/app/ReportDetailScreen";
 
 const Stack = createStackNavigator<AppStackParamList>();
 
@@ -40,8 +38,22 @@ const AppStack = () => {
         name="MyReports"
         component={MyReportsScreen}
         options={{
-          title: "Mis Reportes",
-          headerShown: true,
+          title: "",
+          headerStyle: { backgroundColor: "#080C10" },
+          headerTintColor: "#E6EDF3",
+          headerTitleStyle: { fontWeight: "700", color: "#E6EDF3" },
+          headerShadowVisible: false,
+        }}
+      />
+      <Stack.Screen
+        name="ReportDetail"
+        component={ReportDetailScreen}
+        options={{
+          title: "Detalle del Reporte",
+          headerStyle: { backgroundColor: "#080C10" },
+          headerTintColor: "#E6EDF3",
+          headerTitleStyle: { fontWeight: "700" },
+          headerShadowVisible: false,
         }}
       />
     </Stack.Navigator>
