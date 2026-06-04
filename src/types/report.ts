@@ -1,13 +1,15 @@
-export interface Reporte {
+export interface Report {
   id: string;
-  uidUsuario: string;
-  fotoUrl: string;
-  categoria: string;
-  descripcionIA: string;
-  prioridad: 'Alta' | 'Media' | 'Baja';
-  recomendacion: string;
-  latitud: number;
-  longitud: number;
-  estado: 'pendiente' | 'en_proceso' | 'resuelto';
-  fechaCreacion: any;
+  userId: string;
+  imageUrl: string;
+  category: string;
+  description: string;
+  priority: 'Alta' | 'Media' | 'Baja';
+  recommendation: string;
+  status: 'pendiente' | 'en_proceso' | 'resuelto';
+  latitude: number;
+  longitude: number;
+  address: string;
+  createdAt: any;
+  updatedAt: any;
 }

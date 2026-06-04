@@ -1,22 +1,19 @@
-// src/screens/app/MyReportsScreen.tsx
-import React, { useState, useCallback } from "react";
+// src/screens/app/NewReportScreen.tsx
+import React, { useState } from "react";
 import {
-  View, Text, FlatList, Image, TouchableOpacity,
-  ActivityIndicator, RefreshControl, StatusBar,
+  View, Text, Image, TouchableOpacity,
+  ScrollView, ActivityIndicator, Alert, StatusBar,
 } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
-import { obtenerMisReportes } from "../../services/reportesService";
-import { myReportsStyles as styles } from "../../styles/appStyle"; // ← ajusta si tu archivo se llama distinto
+import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
+import { imageUriToBase64, analizarImagenUrbana, AnalisisIA } from "../../services/geminiService";
+import { useReportes } from "../../hooks/useReportes";
+import { newReportStyles as styles } from "../../styles/appStyle";
 
-const PRIORIDAD_CONFIG: Record<string, { color: string; icon: string }> = {
-  Alta:  { color: "#F85149", icon: "🔴" },
-  Media: { color: "#D29922", icon: "🟡" },
-  Baja:  { color: "#3FB950", icon: "🟢" },
-};
-const ESTADO_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
-  pendiente:  { label: "Pendiente",  color: "#D29922", icon: "⏳" },
-  en_proceso: { label: "En proceso", color: "#58A6FF", icon: "🔧" },
-  resuelto:   { label: "Resuelto",   color: "#3FB950", icon: "✅" },
+
+
+const PRIORIDAD_COLOR: Record<string, string> = {
+  Alta: "#F85149", Media: "#D29922", Baja: "#3FB950",
 };
 const CATEGORIA_EMOJI: Record<string, string> = {
   "Basura acumulada": "🗑️", "Bache o daño vial": "🚧",
@@ -25,168 +22,208 @@ const CATEGORIA_EMOJI: Record<string, string> = {
   "Árbol caído": "🌳", "Otro": "📍",
 };
 
-function formatearFecha(timestamp: any): string {
-  if (!timestamp) return "Sin fecha";
-  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  return date.toLocaleDateString("es-EC", {
-    day: "2-digit", month: "short", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
-  });
-}
+type Etapa = "inicio" | "procesando" | "resultado" | "guardando";
 
-function ReporteCard({ reporte }: { reporte: any }) {
-  const prio = PRIORIDAD_CONFIG[reporte.prioridad] || PRIORIDAD_CONFIG.Media;
-  const estado = ESTADO_CONFIG[reporte.estado] || ESTADO_CONFIG.pendiente;
-  const emoji = CATEGORIA_EMOJI[reporte.categoria] || "📍";
-
-  return (
-    <View style={styles.card}>
-      {reporte.fotoUrl ? (
-        <Image source={{ uri: reporte.fotoUrl }} style={styles.thumbnail} />
-      ) : (
-        <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
-          <Text style={{ fontSize: 28 }}>{emoji}</Text>
-        </View>
-      )}
-      <View style={styles.cardContent}>
-        <View style={styles.cardRow}>
-          <Text style={styles.categoriaText} numberOfLines={1}>
-            {emoji} {reporte.categoria}
-          </Text>
-          <View style={[styles.estadoBadge, { backgroundColor: estado.color + "22" }]}>
-            <Text style={[styles.estadoText, { color: estado.color }]}>
-              {estado.icon} {estado.label}
-            </Text>
-          </View>
-        </View>
-        <Text style={styles.descripcion} numberOfLines={2}>{reporte.descripcionIA}</Text>
-        <View style={styles.cardFooter}>
-          <Text style={[styles.prioridadText, { color: prio.color }]}>
-            {prio.icon} {reporte.prioridad}
-          </Text>
-          <Text style={styles.fechaText}>{formatearFecha(reporte.fechaCreacion)}</Text>
-        </View>
-        {reporte.latitud !== 0 && (
-          <Text style={styles.coordText}>
-            📍 {reporte.latitud?.toFixed(4)}, {reporte.longitud?.toFixed(4)}
-          </Text>
-        )}
-      </View>
-    </View>
-  );
-}
-
-function ResumenStats({ reportes }: { reportes: any[] }) {
-  const stats = [
-    { label: "Total",       value: reportes.length,                                       color: "#58A6FF" },
-    { label: "Pendientes",  value: reportes.filter(r => r.estado === "pendiente").length,  color: "#D29922" },
-    { label: "Resueltos",   value: reportes.filter(r => r.estado === "resuelto").length,   color: "#3FB950" },
-    { label: "Alta prior.", value: reportes.filter(r => r.prioridad === "Alta").length,    color: "#F85149" },
-  ];
-  return (
-    <View style={styles.statsRow}>
-      {stats.map((s) => (
-        <View key={s.label} style={[styles.statBox, { borderColor: s.color + "44" }]}>
-          <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
-          <Text style={styles.statLabel}>{s.label}</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-export function MyReportsScreen({ navigation }: any) {
-  const [reportes, setReportes] = useState<any[]>([]);
-  const [cargando, setCargando] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+export function NewReportScreen({ navigation }: any) {
+  const { guardarReporte } = useReportes();
+  const [etapa, setEtapa] = useState<Etapa>("inicio");
+  const [fotoUri, setFotoUri] = useState<string | null>(null);
+  const [ubicacion, setUbicacion] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [analisis, setAnalisis] = useState<AnalisisIA | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const cargarReportes = useCallback(async () => {
+  // ── Obtener ubicación ─────────────────────────────────────────
+  const obtenerUbicacion = async () => {
     try {
-      const data = await obtenerMisReportes();
-      setReportes(data);
-      setError(null);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === "granted") {
+        const loc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        setUbicacion(loc.coords);
+        return loc.coords;
+      }
+    } catch {}
+    return { latitude: 0, longitude: 0 };
+  };
+
+  // ── Procesar imagen ───────────────────────────────────────────
+  const procesarImagen = async (uri: string) => {
+    setEtapa("procesando");
+    setError(null);
+    try {
+      const coords = await obtenerUbicacion();
+      setUbicacion(coords);
+      const base64 = await imageUriToBase64(uri);
+      const resultado = await analizarImagenUrbana(base64);
+      setAnalisis(resultado);
+      setEtapa("resultado");
     } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setCargando(false);
-      setRefreshing(false);
+      setError(e.message || "Error al procesar la imagen");
+      setEtapa("inicio");
     }
-  }, []);
+  };
 
-  useFocusEffect(
-    useCallback(() => {
-      setCargando(true);
-      cargarReportes();
-    }, [cargarReportes])
-  );
+  // ── Abrir cámara ──────────────────────────────────────────────
+  const abrirCamara = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permiso requerido", "Se necesita acceso a la cámara");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
+    if (!result.canceled) {
+      const uri = result.assets[0].uri;
+      setFotoUri(uri);
+      await procesarImagen(uri);
+    }
+  };
 
-  if (cargando) {
+  // ── Abrir galería ─────────────────────────────────────────────
+  const abrirGaleria = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permiso requerido", "Se necesita acceso a la galería");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7 });
+    if (!result.canceled) {
+      const uri = result.assets[0].uri;
+      setFotoUri(uri);
+      await procesarImagen(uri);
+    }
+  };
+
+  // ── Guardar reporte ───────────────────────────────────────────
+  const handleGuardar = async () => {
+    if (!analisis || !fotoUri) return;
+    setEtapa("guardando");
+    try {
+      await guardarReporte({
+        imageUrl: "",
+        category: analisis.category,
+        description: analisis.description,
+        priority: analisis.priority,
+        recommendation: analisis.recommendation,
+        latitude: ubicacion?.latitude || 0,
+        longitude: ubicacion?.longitude || 0,
+        address: "",
+      }, fotoUri);
+      Alert.alert(
+        "✅ Reporte guardado",
+        `Categoría: ${analisis.category}`,
+        [{ text: "Ver mis reportes", onPress: () => navigation.navigate("MyReports") }]
+      );
+      resetear();
+    } catch (e: any) {
+      Alert.alert("Error", e.message);
+      setEtapa("resultado");
+    }
+  };
+
+  const resetear = () => {
+    setFotoUri(null); setAnalisis(null);
+    setUbicacion(null); setEtapa("inicio"); setError(null);
+  };
+
+  // ── Render: Inicio ────────────────────────────────────────────
+  if (etapa === "inicio") {
+    return (
+      <View style={styles.centered}>
+        <StatusBar barStyle="light-content" />
+        <Text style={styles.cameraTitle}>🌱 Nuevo Reporte</Text>
+        <Text style={styles.cameraHint}>
+          Toma o elige una foto del problema urbano para analizarlo con IA
+        </Text>
+        {error && <Text style={styles.errorBanner}>{error}</Text>}
+        <TouchableOpacity
+          style={[styles.btnPrimary, { width: "100%", marginTop: 40 }]}
+          onPress={abrirCamara}
+        >
+          <Text style={styles.btnText}>📷 Abrir Cámara</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.btnSecondary, { width: "100%", marginTop: 12 }]}
+          onPress={abrirGaleria}
+        >
+          <Text style={styles.btnSecondaryText}>🖼️ Elegir de Galería</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // ── Render: Procesando ────────────────────────────────────────
+  if (etapa === "procesando") {
+    return (
+      <View style={styles.centered}>
+        {fotoUri && <Image source={{ uri: fotoUri }} style={styles.previewSmall} />}
+        <ActivityIndicator size="large" color="#3FB950" style={{ marginTop: 24 }} />
+        <Text style={styles.processingTitle}>Analizando imagen...</Text>
+        <Text style={styles.processingSteps}>
+          📍 Obteniendo ubicación{"\n"}
+          🤖 Consultando Gemini Vision{"\n"}
+          📊 Clasificando incidente
+        </Text>
+      </View>
+    );
+  }
+
+  // ── Render: Resultado ─────────────────────────────────────────
+  if (etapa === "resultado" && analisis) {
+    const emoji = CATEGORIA_EMOJI[analisis.category] || "📍";
+    const prioColor = PRIORIDAD_COLOR[analisis.priority] || "#D29922";
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+        <Text style={styles.resultHeader}>Análisis completado</Text>
+        {fotoUri && <Image source={{ uri: fotoUri }} style={styles.previewFull} />}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardEmoji}>{emoji}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardCategoria}>{analisis.category}</Text>
+              <View style={[styles.badge, { backgroundColor: prioColor + "22" }]}>
+                <Text style={[styles.badgeText, { color: prioColor }]}>
+                  ⚡ Prioridad {analisis.priority}
+                </Text>
+              </View>
+            </View>
+          </View>
+          <View style={styles.divider} />
+          <Text style={styles.label}>📝 Descripción</Text>
+          <Text style={styles.value}>{analisis.description}</Text>
+          <Text style={[styles.label, { marginTop: 12 }]}>✅ Recomendación</Text>
+          <Text style={styles.value}>{analisis.recommendation}</Text>
+          {ubicacion && ubicacion.latitude !== 0 && (
+            <>
+              <Text style={[styles.label, { marginTop: 12 }]}>📍 Ubicación GPS</Text>
+              <Text style={styles.value}>
+                {ubicacion.latitude.toFixed(5)}, {ubicacion.longitude.toFixed(5)}
+              </Text>
+            </>
+          )}
+        </View>
+        <TouchableOpacity style={styles.btnPrimary} onPress={handleGuardar}>
+          <Text style={styles.btnText}>💾 Guardar reporte</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnSecondary} onPress={resetear}>
+          <Text style={styles.btnSecondaryText}>🔄 Tomar otra foto</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    );
+  }
+
+  // ── Render: Guardando ─────────────────────────────────────────
+  if (etapa === "guardando") {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#3FB950" />
-        <Text style={styles.loadingText}>Cargando tus reportes...</Text>
+        <Text style={styles.processingTitle}>Guardando reporte...</Text>
+        <Text style={styles.processingSteps}>
+          ☁️ Subiendo foto{"\n"}🗄️ Guardando en Firestore
+        </Text>
       </View>
     );
   }
 
-  if (error) {
-    return (
-      <View style={styles.centered}>
-        <Text style={{ fontSize: 40, marginBottom: 12 }}>⚠️</Text>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={cargarReportes}>
-          <Text style={styles.retryText}>Reintentar</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      <FlatList
-        data={reportes}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => { setRefreshing(true); cargarReportes(); }}
-            tintColor="#3FB950"
-          />
-        }
-        ListHeaderComponent={
-          <View>
-            <Text style={styles.screenTitle}>🌱 Mis Reportes</Text>
-            {reportes.length > 0 && <ResumenStats reportes={reportes} />}
-          </View>
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={{ fontSize: 64, marginBottom: 16 }}>📭</Text>
-            <Text style={styles.emptyTitle}>Sin reportes aún</Text>
-            <Text style={styles.emptySubtitle}>
-              Usa el botón + para reportar un problema urbano
-            </Text>
-            <TouchableOpacity
-              style={styles.btnNuevo}
-              onPress={() => navigation.navigate("NewReport")}
-            >
-              <Text style={styles.btnNuevoText}>+ Crear primer reporte</Text>
-            </TouchableOpacity>
-          </View>
-        }
-        renderItem={({ item }) => <ReporteCard reporte={item} />}
-      />
-      {reportes.length > 0 && (
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => navigation.navigate("NewReport")}
-        >
-          <Text style={styles.fabText}>+</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
+  return null;
 }

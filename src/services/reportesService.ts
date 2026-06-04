@@ -6,20 +6,21 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage, auth } from "../config/firebase"; // ← tu ruta existente
 
 export interface ReporteInput {
-  fotoUrl: string;
-  categoria: string;
-  descripcionIA: string;
-  prioridad: string;
-  recomendacion: string;
-  latitud: number;
-  longitud: number;
+  imageUrl: string;      
+  category: string;
+  description: string;
+  priority: string;
+  recommendation: string;
+  latitude: number;
+  longitude: number;
+  address?: string;
 }
 
 export async function subirFoto(localUri: string): Promise<string> {
   const response = await fetch(localUri);
   const blob = await response.blob();
   const uid = auth.currentUser?.uid || "anonimo";
-  const filename = `reportes/${uid}/${Date.now()}.jpg`;
+  const filename = `reports/${uid}/${Date.now()}.jpg`;  
   const storageRef = ref(storage, filename);
   await uploadBytes(storageRef, blob);
   return await getDownloadURL(storageRef);
@@ -45,7 +46,7 @@ export async function obtenerMisReportes() {
   const q = query(
     collection(db, "reportes"),
     where("uidUsuario", "==", uid),
-    orderBy("fechaCreacion", "desc")
+    //orderBy("fechaCreacion", "desc")
   );
   const snapshot = await getDocs(q);
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));

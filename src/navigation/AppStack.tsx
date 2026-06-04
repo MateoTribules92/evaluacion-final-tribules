@@ -2,8 +2,10 @@ import React from "react";
 import { createStackNavigator } from "@react-navigation/stack";
 import { AppStackParamList } from "./typeNavigation";
 import { HomeScreen } from "../screens/app/HomeScreen";
-import { NewReportScreen } from "../screens/app/MyReportsScreen";
-import { MyReportsScreen } from "../screens/app/NewReportScreen";
+import { NewReportScreen } from "../screens/app/NewReportScreen";
+import { MyReportsScreen } from "../screens/app/MyReportsScreen";
+
+
 
 
 const Stack = createStackNavigator<AppStackParamList>();
