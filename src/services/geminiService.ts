@@ -1,7 +1,6 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { callGeminiVision } from "../api/geminiApi";
 
-
 export interface AnalisisIA {
   category: string;
   priority: "Alta" | "Media" | "Baja";
@@ -10,14 +9,16 @@ export interface AnalisisIA {
 }
 
 const PROMPT = `
-Eres un asistente de monitoreo urbano. Analiza esta imagen y responde ÚNICAMENTE con un JSON válido (sin markdown, sin texto extra) con esta estructura exacta:
+Analiza la imagen y responde solo este JSON válido:
 
 {
-  "category": "una de estas: Basura acumulada | Bache o daño vial | Luminaria dañada | Fuga de agua | Grafiti o vandalismo | Señalética dañada | Árbol caído | Otro",
+  "category": "Basura acumulada | Bache o daño vial | Luminaria dañada | Fuga de agua | Grafiti o vandalismo | Señalética dañada | Árbol caído | Otro",
   "priority": "Alta | Media | Baja",
-  "description": "descripción breve del problema visible en la imagen (máximo 2 oraciones)",
-  "recommendation": "acción recomendada para resolver el problema"
+  "description": "máximo 1 oración",
+  "recommendation": "máximo 1 oración"
 }
+
+Usa exactamente una categoría y una prioridad de las opciones dadas. Sin markdown. Sin texto extra.
 `;
 
 export async function imageUriToBase64(uri: string): Promise<string> {
@@ -27,9 +28,26 @@ export async function imageUriToBase64(uri: string): Promise<string> {
 export async function analizarImagenUrbana(base64Image: string): Promise<AnalisisIA> {
   try {
     const text = await callGeminiVision(base64Image, PROMPT);
-    const clean = text.replace(/```json|```/gi, "").trim();
-    return JSON.parse(clean) as AnalisisIA;
-  } catch {
+
+    console.log("Respuesta cruda Gemini:", text);
+
+    const clean = text
+      .replace(/```json/gi, "")
+      .replace(/```/g, "")
+      .trim();
+
+    console.log("Respuesta limpia Gemini:", clean);
+
+    const jsonMatch = clean.match(/\{[\s\S]*\}/);
+
+    if (!jsonMatch) {
+      throw new Error("Gemini no devolvió un JSON válido");
+    }
+
+    return JSON.parse(jsonMatch[0]) as AnalisisIA;
+  } catch (error) {
+    console.error("Error analizando imagen urbana:", error);
+
     return {
       category: "Otro",
       priority: "Media",
