@@ -5,6 +5,7 @@ import { HomeScreen } from "../screens/app/HomeScreen";
 import { NewReportScreen } from "../screens/app/NewReportScreen";
 import { MyReportsScreen } from "../screens/app/MyReportsScreen";
 import { ReportDetailScreen } from "../screens/app/ReportDetailScreen";
+import { ReportMapScreen } from "../screens/app/ReportMapScreen";
 
 const Stack = createStackNavigator<AppStackParamList>();
 
@@ -55,6 +56,11 @@ const AppStack = () => {
           headerTitleStyle: { fontWeight: "700" },
           headerShadowVisible: false,
         }}
+      />
+      <Stack.Screen
+        name="ReportMap"
+        component={ReportMapScreen}
+        options={{ title: "Mapa de reportes" }}
       />
     </Stack.Navigator>
   );

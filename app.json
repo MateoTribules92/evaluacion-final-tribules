@@ -26,11 +26,24 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.mateotribules10.autenticacionapp"
+      "package": "com.mateotribules10.autenticacionapp",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAGuxetXVE-k-JobvgD2aJ8WPAyNEdgyhU"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "plugins": [
+      [
+        "react-native-maps",
+        {
+          "androidGoogleMapsApiKey": "AIzaSyAGuxetXVE-k-JobvgD2aJ8WPAyNEdgyhU"
+        }
+      ]
+    ],
     "extra": {
       "eas": {
         "projectId": "caafca11-125b-4e8e-ba2f-eeff3dc6647a"
